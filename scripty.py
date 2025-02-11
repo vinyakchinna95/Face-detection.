@@ -1,83 +1,50 @@
-'''import cv2
-
-# Initialize the webcam
-Video_capture = cv2.VideoCapture(0)  # 0 is usually the default camera
-
-if not Video_capture.isOpened():
-    print("Error: Could not open webcam.")
-    exit()
-
-while True:
-    # Capture frame-by-frame
-    ret, img = Video_capture.read()
-
-    # Check if frame is read correctly
-    if not ret:
-        print("Error: Failed to capture image")
-        break
-
-    # Display the resulting frame
-    cv2.imshow("face detection", img)
-
-    # Break the loop when 'q' is pressed
-    if cv2.waitKey(1) & 0xFF == ord('q'):
-        break
-
-# Release the webcam and close all OpenCV windows
-Video_capture.release()
-cv2.destroyAllWindows()'''
-
 import cv2
-
-def draw_boundary(img, classifier, scaleFactor, minNeighbors, color, text):
-    gray_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    features = classifier.detectMultiScale(gray_img, scaleFactor, minNeighbors)
-    coords = []
-    for (x, y, w, h) in features:
-        cv2.rectangle(img, (x, y), (x+w, y+h), color, 2)
-        cv2.putText(img, text, (x, y-4), cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 1, cv2.LINE_AA)
-        coords = [x, y, w, h]
-    return coords, img
-
-def detect(img, faceCascade):
-    color = {"blue": (255, 0, 0), "red": (0, 0, 255), "green": (0, 255, 0)}
-    coords, img = draw_boundary(img, faceCascade, 1.1, 10, color["blue"], "Face")
-    return img
+import streamlit as st
+import numpy as np
 
 # Load the Haar cascade file for face detection
-faceCascade = cv2.CascadeClassifier("haarcascade_frontalface_default.xml")
+faceCascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
 
-# Check if the classifier loaded correctly
-if faceCascade.empty():
-    print("Error: Could not load face cascade classifier.")
-    exit()
+def detect_faces(image):
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    faces = faceCascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+    
+    for (x, y, w, h) in faces:
+        cv2.rectangle(image, (x, y), (x + w, y + h), (255, 0, 0), 2)
 
-# Initialize the webcam
-Video_capture = cv2.VideoCapture(0)  # 0 is usually the default camera
+    return image, len(faces)
 
-if not Video_capture.isOpened():
-    print("Error: Could not open webcam.")
-    exit()
+def main():
+    st.title("🕵️ Real-Time Face Detection with Streamlit & OpenCV")
 
-while True:
-    # Capture frame-by-frame
-    ret, img = Video_capture.read()
+    run = st.checkbox("Start Webcam")
 
-    # Check if frame is read correctly
-    if not ret:
-        print("Error: Failed to capture image")
-        break
+    if run:
+        video_capture = cv2.VideoCapture(0)
 
-    # Perform face detection
-    img = detect(img, faceCascade)
+        if not video_capture.isOpened():
+            st.error("Could not open webcam. Please check your camera settings.")
+            return
+        
+        stframe = st.empty()
 
-    # Display the resulting frame
-    cv2.imshow("face detection", img)
+        while run:
+            ret, frame = video_capture.read()
+            if not ret:
+                st.error("Failed to capture image.")
+                break
+            
+            frame, faces_count = detect_faces(frame)
 
-    # Break the loop when 'q' is pressed
-    if cv2.waitKey(1) & 0xFF == ord('q'):
-        break
+            # Convert frame to RGB (OpenCV uses BGR by default)
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
-# Release the webcam and close all OpenCV windows
-Video_capture.release()
-cv2.destroyAllWindows()
+            # Display the video frame
+            stframe.image(frame, channels="RGB", use_column_width=True)
+
+            st.write(f"Detected Faces: {faces_count}")
+
+        video_capture.release()
+
+if __name__ == "__main__":
+    main()
